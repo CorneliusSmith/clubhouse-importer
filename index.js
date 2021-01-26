@@ -302,7 +302,7 @@ const _resolve = (path, obj=self, separator='.') => {
     return properties.reduce((prev, curr) => prev && prev[curr], obj)
 }
 
-const testFunc = async () => {
+const importEpic = async () => {
 
     const sourceProjectId = defaultSettings.source_project || defaultSettings.SOURCE_PROJECT_ID
 
@@ -339,6 +339,16 @@ const testFunc = async () => {
         }
         console.log(importEpic)
         //await targetApi.createEpic(importEpic).then(console.log()) //silverorange is source, test is target
+        console.log(await sourceApi.listEpicStories(epic.id))
+    }) 
+    
+}
+
+const testFunc = async () => {
+
+    const sourceProjectId = defaultSettings.source_project || defaultSettings.SOURCE_PROJECT_ID
+
+    await sourceApi.getEpic("12590").then(async epic => {
         console.log(await sourceApi.listEpicStories(epic.id))
     }) 
     
