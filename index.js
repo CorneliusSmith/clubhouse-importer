@@ -7,7 +7,7 @@ const targetApi = ch.create(process.env.CLUBHOUSE_API_TOKEN_TARGET);
 
 const defaultSettings = {
     // TODO: move to args
-    SOURCE_PROJECT_ID: 102,
+    SOURCE_PROJECT_ID: 12683,
     TARGET_PROJECT_ID: 423,
     TARGET_EPIC_ID: 422,
 }
@@ -238,7 +238,7 @@ const _getMapObj = async (apiCall, keyField, innerArrayField) => {
         })        
     })
     console.log(`...Temp map by ${keyField} for ${apiCall}`)
-    console.log(sourceMapNameToId)
+   // console.log(sourceMapNameToId)
 
     const mapSourceToTargetIds = {}
     await targetApi[apiCall]().then(list => {
@@ -274,6 +274,8 @@ const getResourceMaps = async () => {
     const itersMap = await _getMapObj('listIterations', 'name')
     const wfMap = await _getMapObj('listWorkflows', 'name', 'states')
 
+    console.log(membersMap, itersMap, wfMap)
+
     return {
         members: membersMap,
         iterations: itersMap,
@@ -300,12 +302,54 @@ const _resolve = (path, obj=self, separator='.') => {
     return properties.reduce((prev, curr) => prev && prev[curr], obj)
 }
 
+const testFunc = async () => {
+
+    const sourceProjectId = defaultSettings.source_project || defaultSettings.SOURCE_PROJECT_ID
+
+    await sourceApi.getEpic("12590").then(async epic => {
+        //create labels
+        const labelsToAdd = epic.labels.map(label => ({
+                name: label.name, 
+        }))
+
+        //get necessary id fields
+        const idMap = await _getMapObj('listMembers', 'profile.email_address')
+        const owner_ids = epic.owner_ids.map(id => idMap[id])
+        const follower_ids = epic.follower_ids.map(id => idMap[id])
+        const requested_by_id = idMap[epic.requested_by_id]
+
+        const importEpic = {
+            //completed_at_override: epic.completed_at_override,
+            created_at: epic.created_at,
+            deadline: epic.deadline,
+            description: epic.description,
+            // epic_state_id: epic.epic_state_id,
+            // external_id: epic.external_id,
+            follower_ids,
+            group_id: epic.group_id,
+            labels: labelsToAdd,
+            milestone_id: epic.milestone_id,
+            name: epic.name,
+            owner_ids,
+            planned_start_date: epic.planned_start_date,
+            requested_by_id,
+            //started_at_override: epic.started_at_override,
+            state: epic.state,
+            updated_at: epic.updated_at
+        }
+        console.log(importEpic)
+        //await targetApi.createEpic(importEpic).then(console.log()) //silverorange is source, test is target
+        console.log(await sourceApi.listEpicStories(epic.id))
+    }) 
+    
+}
 
 module.exports = {
     importAll: importAll,
     importOne: importOne,
     linkStories: addStoryLinks,
     addIterations: createIterationsFromSource,
+    test: testFunc,
 }
 
 require('make-runnable/custom')({
