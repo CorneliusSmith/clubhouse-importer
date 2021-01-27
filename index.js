@@ -7,8 +7,8 @@ const targetApi = ch.create(process.env.CLUBHOUSE_API_TOKEN_TARGET);
 
 const defaultSettings = {
     // TODO: move to args
-    SOURCE_PROJECT_ID: 12683,
-    TARGET_PROJECT_ID: 423,
+    SOURCE_PROJECT_ID: 12584,
+    TARGET_PROJECT_ID: 12683,
     TARGET_EPIC_ID: 422,
 }
 
@@ -20,7 +20,7 @@ const migratedPrefix = '[Migrated:'
 
 
 const addStoryLinks = async (settings) => {
-    const sourceProjectId = settings.source_project || defaultSettings.SOURCE_PROJECT_ID
+    const sourceProjectId = settings ? settings.source_project : defaultSettings.SOURCE_PROJECT_ID
 
     // Handle mapping for story links (x blocks y, etc)
     // This should run AFTER stories have been migrated.
@@ -133,7 +133,6 @@ const importAll = async (settings) => {
 
 
 const updateStory = async (newStory) => {
-//    console.log(newStory)
     if (!newStory.create.name.startsWith(migratedPrefix)) {
         await targetApi.createStory(newStory.create).then(async res => {
             console.log(`Created new story #${res.id}: ${res.name}`)
@@ -302,15 +301,16 @@ const _resolve = (path, obj=self, separator='.') => {
     return properties.reduce((prev, curr) => prev && prev[curr], obj)
 }
 
-const importEpic = async () => {
+const importEpic = async (sourceEpicId) => {
 
-    const sourceProjectId = defaultSettings.source_project || defaultSettings.SOURCE_PROJECT_ID
+    const resourceMaps = await getResourceMaps()
 
-    await sourceApi.getEpic("12590").then(async epic => {
+    await sourceApi.getEpic(sourceEpicId).then(async epic => {
         //create labels
         const labelsToAdd = epic.labels.map(label => ({
                 name: label.name, 
         }))
+
 
         //get necessary id fields
         const idMap = await _getMapObj('listMembers', 'profile.email_address')
@@ -319,12 +319,9 @@ const importEpic = async () => {
         const requested_by_id = idMap[epic.requested_by_id]
 
         const importEpic = {
-            //completed_at_override: epic.completed_at_override,
             created_at: epic.created_at,
             deadline: epic.deadline,
             description: epic.description,
-            // epic_state_id: epic.epic_state_id,
-            // external_id: epic.external_id,
             follower_ids,
             group_id: epic.group_id,
             labels: labelsToAdd,
@@ -333,25 +330,44 @@ const importEpic = async () => {
             owner_ids,
             planned_start_date: epic.planned_start_date,
             requested_by_id,
-            //started_at_override: epic.started_at_override,
             state: epic.state,
             updated_at: epic.updated_at
         }
         console.log(importEpic)
-        //await targetApi.createEpic(importEpic).then(console.log()) //silverorange is source, test is target
-        console.log(await sourceApi.listEpicStories(epic.id))
+        await targetApi.createEpic(importEpic).then(async epic => createEpicStories(sourceEpicId, epic.id, resourceMaps)) //silverorange is source, test is targe
     }) 
     
 }
 
-const testFunc = async () => {
-
-    const sourceProjectId = defaultSettings.source_project || defaultSettings.SOURCE_PROJECT_ID
-
-    await sourceApi.getEpic("12590").then(async epic => {
-        console.log(await sourceApi.listEpicStories(epic.id))
+const importAllEpics = async (projectId) => {
+    // console.log(projectId)
+    const epicIds = await sourceApi.listEpics().then(async epics => {
+        const reducedEpics = epics.reduce(function (res, epic) {
+        if (epic.project_ids.includes(projectId)) {
+            res.push(epic);
+        }
+        return res;
+    }, []);  
+    return reducedEpics.map(e => e.id)
     }) 
-    
+    epicIds.forEach( epicId => importEpic(epicId)) 
+    return "Done Importing Epics"
+}
+
+const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
+
+    const targetProjectId = defaultSettings.target_project || defaultSettings.TARGET_PROJECT_ID
+
+    await sourceApi.getEpic(sourceEpicId).then(async epic => {
+        const epicStoryIds = await sourceApi.listEpicStories(epic.id).then(async stories => {
+            return stories.map(s => s.id)
+        })
+        epicStoryIds.forEach(async story => {
+           let fetchedStory  = await getStoryForImport(story, resourceMaps, targetProjectId, targetEpicId)
+           console.log(fetchedStory)
+           updateStory(fetchedStory)
+       })
+    })
 }
 
 module.exports = {
@@ -359,7 +375,8 @@ module.exports = {
     importOne: importOne,
     linkStories: addStoryLinks,
     addIterations: createIterationsFromSource,
-    test: testFunc,
+    importAllEpics,
+    importEpic,
 }
 
 require('make-runnable/custom')({
