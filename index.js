@@ -242,7 +242,7 @@ const _getMapObj = async (apiCall, keyField, innerArrayField) => {
     });
   });
   console.log(`...Temp map by ${keyField} for ${apiCall}`);
-  // console.log(sourceMapNameToId)
+  console.log(sourceMapNameToId);
 
   const mapSourceToTargetIds = {};
   await targetApi[apiCall]().then((list) => {
@@ -342,7 +342,6 @@ const importEpic = async (sourceEpicId) => {
 };
 
 const importAllEpics = async (projectId) => {
-  // console.log(projectId)
   const epicIds = await sourceApi.listEpics().then(async (epics) => {
     const reducedEpics = epics.reduce(function (res, epic) {
       if (epic.project_ids.includes(projectId)) {
@@ -381,14 +380,29 @@ const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
 
 const createMilestone = async (milestoneId) => {
   await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
-    const newMilestone = _cleanObj({
+    const importMilestone = _cleanObj({
       name: milestone.name,
       categories: milestone.categories,
       started_at_override: milestone.started_at_override,
       completed_at_override: milestone.completed_at_override,
       state: milestone.state,
     });
-    await targetApi.createMilestone(newMilestone).then(console.log());
+    await targetApi.createMilestone(importMilestone).then(console.log());
+  });
+};
+
+const importAllLabels = async () => {
+  toImport = [];
+  const existingLabels = await targetApi.listLabels().then((labels) => {
+    return labels.map((label) => label.name.toLowerCase());
+  });
+  await sourceApi.listLabels().then(async (labels) => {
+    labels.map(async (label) => {
+      //Adds only labels that havent been prevoiusly migrated to the target workspace
+      if (!existingLabels.includes(label.name.toLowerCase())) {
+        await targetApi.createLabel(label.name, label.color);
+      }
+    });
   });
 };
 
@@ -400,6 +414,7 @@ module.exports = {
   importAllEpics,
   importEpic,
   createMilestone,
+  importAllLabels,
 };
 
 require("make-runnable/custom")({
