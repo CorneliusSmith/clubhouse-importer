@@ -1,5 +1,6 @@
-dotenv = require("dotenv").config();
-const ch = require("clubhouse-lib");
+// dotenv = require('dotenv').config();
+import ch from 'clubhouse-lib';
+// const ch = require('clubhouse-lib');
 
 // API Clients per workspace
 const sourceApi = ch.create(process.env.CLUBHOUSE_API_TOKEN_SOURCE);
@@ -14,7 +15,7 @@ const defaultSettings = {
 
 // Used to update story names that have been migrated from the source workspace
 // and identify stories that have previously been migrated.
-const migratedPrefix = "[Migrated:";
+const migratedPrefix = '[Migrated:';
 
 const addStoryLinks = async (settings) => {
   const sourceProjectId = settings
@@ -23,35 +24,33 @@ const addStoryLinks = async (settings) => {
 
   // Handle mapping for story links (x blocks y, etc)
   // This should run AFTER stories have been migrated.
-  let storiesMap = {};
-  let allStoryLinks = [];
-  let sourceStories = await sourceApi
-    .listStories(sourceProjectId)
-    .then((stories) => {
-      stories.forEach((s) => {
-        s.story_links.forEach((link) => {
-          allStoryLinks.push({
-            archived: s.archived,
-            story_to_fix: s.id,
-            old_subject_id: link.subject_id,
-            verb: link.verb,
-            old_object_id: link.object_id,
-            created_at: link.created_id,
-            updated_at: link.updated_at,
-          });
+  const storiesMap = {};
+  const allStoryLinks = [];
+  await sourceApi.listStories(sourceProjectId).then((stories) => {
+    stories.forEach((s) => {
+      s.story_links.forEach((link) => {
+        allStoryLinks.push({
+          archived: s.archived,
+          story_to_fix: s.id,
+          old_subject_id: link.subject_id,
+          verb: link.verb,
+          old_object_id: link.object_id,
+          created_at: link.created_id,
+          updated_at: link.updated_at,
         });
-        // parse out the new id from the old story name, add to the map.
-        const newId = s.name.split(migratedPrefix).pop().split("]")[0];
-        storiesMap[s.id] = newId;
       });
-      return stories;
+      // parse out the new id from the old story name, add to the map.
+      const newId = s.name.split(migratedPrefix).pop().split(']')[0];
+      storiesMap[s.id] = newId;
     });
+    return stories;
+  });
 
   console.log(
     `Creating missing story links for ${allStoryLinks.length} stories`
   );
-  for (let link of allStoryLinks) {
-    let linkParam = {
+  for (const link of allStoryLinks) {
+    const linkParam = {
       object_id: storiesMap[link.old_object_id],
       subject_id: storiesMap[link.old_subject_id],
       verb: link.verb,
@@ -92,7 +91,7 @@ const importOne = async (settings) => {
   const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
 
   const resourceMaps = await getResourceMaps();
-  let newStory = await getStoryForImport(
+  const newStory = await getStoryForImport(
     storyId,
     resourceMaps,
     targetProjectId,
@@ -121,9 +120,9 @@ const importAll = async (settings) => {
 
   const resourceMaps = await getResourceMaps();
 
-  let toImport = [];
-  for (let storyId of sourceStoryIds) {
-    let newStory = await getStoryForImport(
+  const toImport = [];
+  for (const storyId of sourceStoryIds) {
+    const newStory = await getStoryForImport(
       storyId,
       resourceMaps,
       targetProjectId,
@@ -134,7 +133,7 @@ const importAll = async (settings) => {
   //toImport = toImport.slice(0, 10)
   console.log(toImport.length);
 
-  for (let newStory of toImport) {
+  for (const newStory of toImport) {
     await updateStory(newStory);
   }
 };
@@ -144,8 +143,8 @@ const updateStory = async (newStory) => {
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
       console.log(` - - via old source story #${newStory.id}`);
-      const origDescription = newStory.create.description || "";
-      let updateSource = {
+      const origDescription = newStory.create.description || '';
+      const updateSource = {
         name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
         description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
       };
@@ -169,7 +168,7 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     return sty;
   });
 
-  let sourceComments = s.comments.map((c) => {
+  const sourceComments = s.comments.map((c) => {
     return {
       author_id: members[c.author_id],
       created_at: c.created_at,
@@ -178,7 +177,7 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     };
   });
   console.log(sourceComments);
-  let sourceTasks = s.tasks.map((t) => {
+  const sourceTasks = s.tasks.map((t) => {
     return {
       // a task is "complete" not "completed" like stories.
       complete: t.complete,
@@ -189,7 +188,7 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     };
   });
 
-  let newStory = {
+  const newStory = {
     archived: s.archived,
     comments: sourceComments,
     completed_at_override: s.created_at_override,
@@ -272,9 +271,9 @@ const _getMapObj = async (apiCall, keyField, innerArrayField) => {
    TODO: do this for epics too.
 */
 const getResourceMaps = async () => {
-  const membersMap = await _getMapObj("listMembers", "profile.email_address");
-  const itersMap = await _getMapObj("listIterations", "name");
-  const wfMap = await _getMapObj("listWorkflows", "name", "states");
+  const membersMap = await _getMapObj('listMembers', 'profile.email_address');
+  const itersMap = await _getMapObj('listIterations', 'name');
+  const wfMap = await _getMapObj('listWorkflows', 'name', 'states');
 
   console.log(membersMap, itersMap, wfMap);
 
@@ -287,9 +286,9 @@ const getResourceMaps = async () => {
 
 /* Utility to remove null and undefined values from an object */
 const _cleanObj = (obj) => {
-  var propNames = Object.getOwnPropertyNames(obj);
-  for (var i = 0; i < propNames.length; i++) {
-    var propName = propNames[i];
+  const propNames = Object.getOwnPropertyNames(obj);
+  for (let i = 0; i < propNames.length; i++) {
+    const propName = propNames[i];
     if (obj[propName] === null || obj[propName] === undefined) {
       delete obj[propName];
     }
@@ -298,8 +297,8 @@ const _cleanObj = (obj) => {
 };
 
 /* Utility to do a deep resolution of a nested object key */
-const _resolve = (path, obj = self, separator = ".") => {
-  var properties = Array.isArray(path) ? path : path.split(separator);
+const _resolve = (path, obj = this, separator = '.') => {
+  const properties = Array.isArray(path) ? path : path.split(separator);
   return properties.reduce((prev, curr) => prev && prev[curr], obj);
 };
 
@@ -313,7 +312,7 @@ const importEpic = async (sourceEpicId) => {
     }));
 
     //get necessary id fields
-    const idMap = await _getMapObj("listMembers", "profile.email_address");
+    const idMap = await _getMapObj('listMembers', 'profile.email_address');
     const owner_ids = epic.owner_ids.map((id) => idMap[id]);
     const follower_ids = epic.follower_ids.map((id) => idMap[id]);
     const requested_by_id = idMap[epic.requested_by_id];
@@ -352,7 +351,7 @@ const importAllEpics = async (projectId) => {
     return reducedEpics.map((e) => e.id);
   });
   epicIds.forEach((epicId) => importEpic(epicId));
-  return "Done Importing Epics";
+  return 'Done Importing Epics';
 };
 
 const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
@@ -366,7 +365,7 @@ const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
         return stories.map((s) => s.id);
       });
     epicStoryIds.forEach(async (story) => {
-      let fetchedStory = await getStoryForImport(
+      const fetchedStory = await getStoryForImport(
         story,
         resourceMaps,
         targetProjectId,
@@ -392,7 +391,7 @@ const createMilestone = async (milestoneId) => {
 };
 
 const importAllLabels = async () => {
-  toImport = [];
+  // toImport = [];
   const existingLabels = await targetApi.listLabels().then((labels) => {
     return labels.map((label) => label.name.toLowerCase());
   });
@@ -407,8 +406,8 @@ const importAllLabels = async () => {
 };
 
 module.exports = {
-  importAll: importAll,
-  importOne: importOne,
+  importAll,
+  importOne,
   linkStories: addStoryLinks,
   addIterations: createIterationsFromSource,
   importAllEpics,
@@ -417,6 +416,6 @@ module.exports = {
   importAllLabels,
 };
 
-require("make-runnable/custom")({
+require('make-runnable/custom')({
   printOutputFrame: false,
 });
