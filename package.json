@@ -1,8 +1,10 @@
 {
   "dependencies": {
+    "@types/node": "^12.0.0",
     "clubhouse-lib": "^0.10.0",
     "dotenv": "^8.2.0",
-    "make-runnable": "^1.3.6"
+    "make-runnable": "^1.3.6",
+    "typescript": "^4.0.3"
   },
   "name": "clubhouse-api",
   "version": "1.0.0",
