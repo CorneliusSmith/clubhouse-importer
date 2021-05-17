@@ -2,6 +2,7 @@
 import Clubhouse, { ID, Iteration, Member, Workflow } from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
 import { type } from 'os';
+import { _resolve } from './utils';
 dotenv.config();
 
 type ResourceMap = {
@@ -334,24 +335,6 @@ const getResourceMaps = async () => {
     iterations: itersMap,
     workflows: wfMap,
   };
-};
-
-// /* Utility to remove null and undefined values from an object */
-// const _cleanObj = (obj) => {
-//   const propNames = Object.getOwnPropertyNames(obj);
-//   for (let i = 0; i < propNames.length; i++) {
-//     const propName = propNames[i];
-//     if (obj[propName] === null || obj[propName] === undefined) {
-//       delete obj[propName];
-//     }
-//   }
-//   return obj;
-// };
-
-// /* Utility to do a deep resolution of a nested object key */
-const _resolve = (path: string | string[], obj: any, separator = '.') => {
-  var properties = Array.isArray(path) ? path : path.split(separator);
-  return properties.reduce((prev, curr) => prev && prev[curr], obj);
 };
 
 // const importEpic = async (sourceEpicId) => {
