@@ -2,12 +2,8 @@
 import Clubhouse, { ID, Iteration, Member, Workflow } from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
 import { type } from 'os';
-import { _resolve } from './utils';
+import { _getMapObj, _resolve } from './utils';
 dotenv.config();
-
-type ResourceMap = {
-  [key: string]: ID;
-};
 
 // API Clients per workspace
 console.log(process.env.CLUBHOUSE_API_TOKEN_SOURCE);
@@ -258,73 +254,30 @@ const migratedPrefix = '[Migrated:';
 //   return memberIds;
 // };
 
-const _getMapObj = async (
-  apiCall: 'listMembers' | 'listIterations' | 'listWorkflows',
-  keyField: string,
-  innerArrayField?: 'states'
-) => {
-  const sourceMapNameToId: ResourceMap = {};
-  await sourceApi[apiCall]().then(
-    (list: Member[] | Iteration[] | Workflow[]) => {
-      list.forEach((i: Member | Iteration | Workflow) => {
-        if (innerArrayField && i.hasOwnProperty(innerArrayField)) {
-          (i as Workflow)[innerArrayField].forEach((inner) => {
-            sourceMapNameToId[_resolve(keyField, inner)] = inner.id;
-          });
-        } else {
-          sourceMapNameToId[_resolve(keyField, i)] = i.id;
-        }
-      });
-    }
-  );
-
-  await sourceApi[apiCall]().then(
-    (list: Member[] | Iteration[] | Workflow[]) => {
-      list.forEach((i: Member | Iteration | Workflow) => {
-        if (innerArrayField && i.hasOwnProperty(innerArrayField)) {
-          (i as Workflow)[innerArrayField].forEach((inner) => {
-            sourceMapNameToId[_resolve(keyField, inner)] = inner.id;
-          });
-        } else {
-          sourceMapNameToId[_resolve(keyField, i)] = i.id;
-        }
-      });
-    }
-  );
-  console.log(`...Temp map by ${keyField} for ${apiCall}`);
-  // console.log(sourceMapNameToId);
-
-  const mapSourceToTargetIds: ResourceMap = {};
-  await targetApi[apiCall]().then(
-    (list: Member[] | Iteration[] | Workflow[]) => {
-      list.forEach((i: Member | Iteration | Workflow) => {
-        if (innerArrayField && i.hasOwnProperty(innerArrayField)) {
-          (i as Workflow)[innerArrayField].forEach((inner) => {
-            const oldId = sourceMapNameToId[_resolve(keyField, inner)];
-            if (oldId) {
-              mapSourceToTargetIds[oldId] = inner.id;
-            }
-          });
-        } else {
-          const oldId = sourceMapNameToId[_resolve(keyField, i)];
-          if (oldId) {
-            mapSourceToTargetIds[oldId] = i.id;
-          }
-        }
-      });
-    }
-  );
-  return mapSourceToTargetIds;
-};
-
 /* Create objects mapping old workspace ids to new workspace ids for
    member, iterataion, and workflow resources
    TODO: do this for epics too.
 */
 const getResourceMaps = async () => {
-  const membersMap = await _getMapObj('listMembers', 'profile.email_address');
-  const itersMap = await _getMapObj('listIterations', 'name');
-  const wfMap = await _getMapObj('listWorkflows', 'name', 'states');
+  const membersMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listMembers',
+    'profile.email_address'
+  );
+  const itersMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listIterations',
+    'name'
+  );
+  const wfMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listWorkflows',
+    'name',
+    'states'
+  );
   console.log({
     members: membersMap,
     iterations: itersMap,
