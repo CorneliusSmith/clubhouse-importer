@@ -1,6 +1,5 @@
-// dotenv = require('dotenv').config();
-import ch from 'clubhouse-lib';
-// const ch = require('clubhouse-lib');
+dotenv = require('dotenv').config();
+const ch = require('clubhouse-lib');
 
 // API Clients per workspace
 const sourceApi = ch.create(process.env.CLUBHOUSE_API_TOKEN_SOURCE);
@@ -10,7 +9,7 @@ const defaultSettings = {
   // TODO: move to args
   SOURCE_PROJECT_ID: 12584,
   TARGET_PROJECT_ID: 12683,
-  TARGET_EPIC_ID: 422,
+  TARGET_EPIC_ID: 14924,
 };
 
 // Used to update story names that have been migrated from the source workspace
@@ -97,6 +96,13 @@ const importOne = async (settings) => {
     targetProjectId,
     targetEpicId
   );
+  const linked_file_ids = await uploadFiles(newStory.create.files);
+  for (const linked_file_id in linked_file_ids) {
+    if (linked_file_id) {
+      newStory.create.linked_file_ids.push(linked_file_ids[linked_file_id]);
+    }
+  }
+
   await updateStory(newStory);
 };
 
@@ -140,16 +146,18 @@ const importAll = async (settings) => {
 
 const updateStory = async (newStory) => {
   if (!newStory.create.name.startsWith(migratedPrefix)) {
+    delete newStory.create.files;
+    console.log('Want To Create:', newStory.create.name);
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
       console.log(` - - via old source story #${newStory.id}`);
-      const origDescription = newStory.create.description || '';
-      const updateSource = {
-        name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
-        description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
-      };
+      // const origDescription = newStory.create.description || '';
+      // const updateSource = {
+      //   name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
+      //   description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
+      // };
 
-      await sourceApi.updateStory(newStory.id, updateSource).then(console.log);
+      // await sourceApi.updateStory(newStory.id, updateSource).then(console.log);
     });
   } else {
     console.log(
@@ -168,6 +176,8 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     return sty;
   });
 
+  const linked_file_ids = await uploadFiles(s.linked_files);
+
   const sourceComments = s.comments.map((c) => {
     return {
       author_id: members[c.author_id],
@@ -176,7 +186,6 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
       text: c.text,
     };
   });
-  console.log(sourceComments);
   const sourceTasks = s.tasks.map((t) => {
     return {
       // a task is "complete" not "completed" like stories.
@@ -198,9 +207,17 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     epic_id: epicId,
     estimate: s.estimate,
     external_id: s.app_url,
+    external_links: s.external_links,
     follower_ids: mapMembers(s.follower_ids, members),
     iteration_id: iterations[s.iteration_id],
     name: s.name,
+    labels: s.labels.map((label) => {
+      return {
+        name: label.name,
+      };
+    }),
+    files: s.files, //This causes error. Get fileId before create stoy, set this to be empty and then after story is created in target api call get file and update the target story to upload the file
+    linked_file_ids,
     owner_ids: mapMembers(s.owner_ids, members),
     project_id: projectId,
     requested_by_id: members[s.requested_by_id],
@@ -208,8 +225,9 @@ const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
     story_type: s.story_type,
     tasks: sourceTasks,
     updated_at: s.updated_at,
-    workflow_state_id: workflows[s.workflow_state_id],
+    // workflow_state_id: 500000956,
   };
+
   return {
     id: s.id,
     create: _cleanObj(newStory),
@@ -241,7 +259,7 @@ const _getMapObj = async (apiCall, keyField, innerArrayField) => {
     });
   });
   console.log(`...Temp map by ${keyField} for ${apiCall}`);
-  console.log(sourceMapNameToId);
+  // console.log(sourceMapNameToId);
 
   const mapSourceToTargetIds = {};
   await targetApi[apiCall]().then((list) => {
@@ -274,9 +292,6 @@ const getResourceMaps = async () => {
   const membersMap = await _getMapObj('listMembers', 'profile.email_address');
   const itersMap = await _getMapObj('listIterations', 'name');
   const wfMap = await _getMapObj('listWorkflows', 'name', 'states');
-
-  console.log(membersMap, itersMap, wfMap);
-
   return {
     members: membersMap,
     iterations: itersMap,
@@ -331,16 +346,14 @@ const importEpic = async (sourceEpicId) => {
       state: epic.state,
       updated_at: epic.updated_at,
     };
-    console.log(importEpic);
-    await targetApi
-      .createEpic(importEpic)
-      .then(async (epic) =>
-        createEpicStories(sourceEpicId, epic.id, resourceMaps)
-      ); //silverorange is source, test is targe
+    await targetApi.createEpic(importEpic).then(async (epic) => {
+      createEpicStories(sourceEpicId, epic.id, resourceMaps);
+    }); //silverorange is source, test is target
   });
 };
 
 const importAllEpics = async (projectId) => {
+  //TODO: filter out epics with emrap labels
   const epicIds = await sourceApi.listEpics().then(async (epics) => {
     const reducedEpics = epics.reduce(function (res, epic) {
       if (epic.project_ids.includes(projectId)) {
@@ -371,7 +384,6 @@ const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
         targetProjectId,
         targetEpicId
       );
-      console.log(fetchedStory);
       updateStory(fetchedStory);
     });
   });
@@ -404,6 +416,24 @@ const importAllLabels = async () => {
     });
   });
 };
+
+async function uploadFiles(files) {
+  const fileIDs = [];
+  for (const file in files) {
+    if (file) {
+      const fileForUpload = files[file];
+      const uploadFile = await targetApi.createLinkedFile({
+        name: fileForUpload.name,
+        type: 'url',
+        description: fileForUpload.description,
+        content_type: fileForUpload.content_type,
+        url: fileForUpload.url,
+      });
+      fileIDs.push(uploadFile.id);
+    }
+  }
+  return fileIDs;
+}
 
 module.exports = {
   importAll,
