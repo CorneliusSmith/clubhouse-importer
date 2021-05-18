@@ -408,20 +408,23 @@ const createMilestone = async (milestoneId: ID) => {
   });
 };
 
-// const importAllLabels = async () => {
-//   // toImport = [];
-//   const existingLabels = await targetApi.listLabels().then((labels) => {
-//     return labels.map((label) => label.name.toLowerCase());
-//   });
-//   await sourceApi.listLabels().then(async (labels) => {
-//     labels.map(async (label) => {
-//       //Adds only labels that havent been prevoiusly migrated to the target workspace
-//       if (!existingLabels.includes(label.name.toLowerCase())) {
-//         await targetApi.createLabel(label.name, label.color);
-//       }
-//     });
-//   });
-// };
+const importAllLabels = async () => {
+  // toImport = [];
+  const existingLabels = await targetApi.listLabels().then((labels) => {
+    return labels.map((label) => label.name.toLowerCase());
+  });
+  await sourceApi.listLabels().then(async (labels) => {
+    labels.map(async (label) => {
+      //Adds only labels that havent been prevoiusly migrated to the target workspace
+      if (!existingLabels.includes(label.name.toLowerCase())) {
+        await targetApi.createLabel(
+          label.name,
+          label.color ? label.color : 'black' //default to black color if no color exists
+        );
+      }
+    });
+  });
+};
 
 async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
   const fileIDs = [];
