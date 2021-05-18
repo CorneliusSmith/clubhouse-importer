@@ -1,16 +1,6 @@
 // const ch = require('clubhouse-lib');
-import Clubhouse, {
-  File,
-  ID,
-  Iteration,
-  LinkedFile,
-  Member,
-  Story,
-  StoryChange,
-  Workflow,
-} from 'clubhouse-lib';
+import Clubhouse, { Epic, File, ID, LinkedFile } from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
-import { type } from 'os';
 import { ResourceMap, ResourceMaps, StoryForUpload } from './types';
 import {
   _getMapObj,
@@ -28,7 +18,7 @@ const targetApi = Clubhouse.create(
   process.env.CLUBHOUSE_API_TOKEN_TARGET || ''
 );
 
-const defaultSettings = {
+export const defaultSettings = {
   // TODO: move to args
   SOURCE_PROJECT_ID: 12584,
   TARGET_PROJECT_ID: 12683,
@@ -181,7 +171,6 @@ async function updateStory(newStory: StoryForUpload) {
     newStory.create.name &&
     !newStory.create.name.startsWith(migratedPrefix)
   ) {
-    console.log(newStory);
     console.log('Want To Create:', newStory.create.name);
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
@@ -204,8 +193,8 @@ async function updateStory(newStory: StoryForUpload) {
 const getStoryForImport = async (
   storyId: number,
   resourceMaps: ResourceMaps,
-  projectId: number,
-  epicId: number
+  projectId: ID,
+  epicId: ID
 ) => {
   const members = resourceMaps.members;
   const iterations = resourceMaps.iterations;
@@ -320,77 +309,89 @@ const getResourceMaps = async () => {
   };
 };
 
-// const importEpic = async (sourceEpicId) => {
-//   const resourceMaps = await getResourceMaps();
+const importEpic = async (sourceEpicId: ID) => {
+  const resourceMaps = await getResourceMaps();
 
-//   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
-//     //create labels
-//     const labelsToAdd = epic.labels.map((label) => ({
-//       name: label.name,
-//     }));
+  await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
+    //create labels
+    const labelsToAdd = epic.labels.map((label) => ({
+      name: label.name,
+    }));
 
-//     //get necessary id fields
-//     const idMap = await _getMapObj('listMembers', 'profile.email_address');
-//     const owner_ids = epic.owner_ids.map((id) => idMap[id]);
-//     const follower_ids = epic.follower_ids.map((id) => idMap[id]);
-//     const requested_by_id = idMap[epic.requested_by_id];
+    //get necessary id fields
+    const idMap = await _getMapObj(
+      sourceApi,
+      targetApi,
+      'listMembers',
+      'profile.email_address'
+    );
+    const owner_ids = epic.owner_ids.map((id) => idMap[id]);
+    const follower_ids = epic.follower_ids.map((id) => idMap[id]);
+    const requested_by_id = idMap[epic.requested_by_id];
 
-//     const importEpic = {
-//       created_at: epic.created_at,
-//       deadline: epic.deadline,
-//       description: epic.description,
-//       follower_ids,
-//       group_id: epic.group_id,
-//       labels: labelsToAdd,
-//       name: epic.name,
-//       owner_ids,
-//       planned_start_date: epic.planned_start_date,
-//       requested_by_id,
-//       state: epic.state,
-//       updated_at: epic.updated_at,
-//     };
-//     await targetApi.createEpic(importEpic).then(async (epic) => {
-//       createEpicStories(sourceEpicId, epic.id, resourceMaps);
-//     }); //silverorange is source, test is target
-//   });
-// };
+    const importEpic = {
+      created_at: epic.created_at,
+      deadline: epic.deadline,
+      description: epic.description,
+      follower_ids,
+      group_id: epic.group_id,
+      labels: labelsToAdd,
+      name: epic.name,
+      owner_ids,
+      planned_start_date: epic.planned_start_date,
+      requested_by_id,
+      state: epic.state,
+      updated_at: epic.updated_at,
+    };
+    await targetApi.createEpic(importEpic).then(async (epic) => {
+      createEpicStories(sourceEpicId, epic.id, resourceMaps);
+    }); //silverorange is source, test is target
+  });
+};
 
-// const importAllEpics = async (projectId) => {
-//   //TODO: filter out epics with emrap labels
-//   const epicIds = await sourceApi.listEpics().then(async (epics) => {
-//     const reducedEpics = epics.reduce(function (res, epic) {
-//       if (epic.project_ids.includes(projectId)) {
-//         res.push(epic);
-//       }
-//       return res;
-//     }, []);
-//     return reducedEpics.map((e) => e.id);
-//   });
-//   epicIds.forEach((epicId) => importEpic(epicId));
-//   return 'Done Importing Epics';
-// };
+const importAllEpics = async (projectId: number) => {
+  //TODO: filter out epics with emrap labels
+  const epicIds = await sourceApi.listEpics().then(async (epics) => {
+    const reducedEpics = epics.reduce((res: Epic[], epic) => {
+      if (epic.project_ids.includes(projectId)) {
+        res.push(epic);
+      }
+      return res;
+    }, []);
+    return reducedEpics.map((e) => e.id);
+  });
+  epicIds.forEach((epicId) => importEpic(epicId));
+  return 'Done Importing Epics';
+};
 
-// const createEpicStories = async (sourceEpicId, targetEpicId, resourceMaps) => {
-//   const targetProjectId =
-//     defaultSettings.target_project || defaultSettings.TARGET_PROJECT_ID;
+const createEpicStories = async (
+  sourceEpicId: ID,
+  targetEpicId: ID,
+  resourceMaps: ResourceMaps
+) => {
+  const targetProjectId = defaultSettings.TARGET_PROJECT_ID;
 
-//   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
-//     const epicStoryIds = await sourceApi
-//       .listEpicStories(epic.id)
-//       .then(async (stories) => {
-//         return stories.map((s) => s.id);
-//       });
-//     epicStoryIds.forEach(async (story) => {
-//       const fetchedStory = await getStoryForImport(
-//         story,
-//         resourceMaps,
-//         targetProjectId,
-//         targetEpicId
-//       );
-//       updateStory(fetchedStory);
-//     });
-//   });
-// };
+  await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
+    const epicStoryIds = await sourceApi
+      .listEpicStories(epic.id)
+      .then(async (stories) => {
+        return stories.map((s) => s.id);
+      });
+    epicStoryIds.forEach(async (story) => {
+      const fetchedStory = await getStoryForImport(
+        story,
+        resourceMaps,
+        targetProjectId,
+        targetEpicId
+      );
+      fetchedStory.create = mapStoryToStoryChange(
+        fetchedStory.create,
+        fetchedStory.create.linked_file_ids
+      );
+      updateStory(fetchedStory);
+    });
+  });
+};
 
 // const createMilestone = async (milestoneId) => {
 //   await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
@@ -453,4 +454,4 @@ async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
 // require('make-runnable/custom')({
 //   printOutputFrame: false,
 // });
-importOne({ story: 17461 });
+importEpic(8309);
