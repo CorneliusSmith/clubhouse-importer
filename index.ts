@@ -128,43 +128,43 @@ const importOne = async (settings: any) => {
   await updateStory(newStory);
 };
 
-// const importAll = async (settings) => {
-//   const sourceProjectId =
-//     settings.source_project || defaultSettings.SOURCE_PROJECT_ID;
-//   const targetProjectId =
-//     settings.target_project || defaultSettings.TARGET_PROJECT_ID;
-//   const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
+const importAll = async (settings: any) => {
+  const sourceProjectId =
+    settings.source_project || defaultSettings.SOURCE_PROJECT_ID;
+  const targetProjectId =
+    settings.target_project || defaultSettings.TARGET_PROJECT_ID;
+  const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
 
-//   await sourceApi.listProjects().then((projs) => {
-//     projs.forEach((p) => console.log(p.name));
-//   });
+  await sourceApi.listProjects().then((projs) => {
+    projs.forEach((p) => console.log(p.name));
+  });
 
-//   const sourceStoryIds = await sourceApi
-//     .listStories(sourceProjectId)
-//     .then((stories) => {
-//       return stories.map((s) => s.id);
-//     });
-//   console.log(sourceStoryIds);
+  const sourceStoryIds = await sourceApi
+    .listStories(sourceProjectId)
+    .then((stories) => {
+      return stories.map((s) => s.id);
+    });
+  console.log(sourceStoryIds);
 
-//   const resourceMaps = await getResourceMaps();
+  const resourceMaps = await getResourceMaps();
 
-//   const toImport = [];
-//   for (const storyId of sourceStoryIds) {
-//     const newStory = await getStoryForImport(
-//       storyId,
-//       resourceMaps,
-//       targetProjectId,
-//       targetEpicId
-//     );
-//     toImport.push(newStory);
-//   }
-//   //toImport = toImport.slice(0, 10)
-//   console.log(toImport.length);
+  const toImport = [];
+  for (const storyId of sourceStoryIds) {
+    const newStory = await getStoryForImport(
+      storyId,
+      resourceMaps,
+      targetProjectId,
+      targetEpicId
+    );
+    toImport.push(newStory);
+  }
+  //toImport = toImport.slice(0, 10)
+  console.log(toImport.length);
 
-//   for (const newStory of toImport) {
-//     await updateStory(newStory);
-//   }
-// };
+  for (const newStory of toImport) {
+    await updateStory(newStory);
+  }
+};
 
 async function updateStory(newStory: StoryForUpload) {
   if (
@@ -277,7 +277,7 @@ const mapMembers = (oldMemberIds: ID[], membersMap: ResourceMap) => {
    member, iterataion, and workflow resources
    TODO: do this for epics too.
 */
-const getResourceMaps = async () => {
+const getResourceMaps = async (): Promise<ResourceMaps> => {
   const membersMap = await _getMapObj(
     sourceApi,
     targetApi,
