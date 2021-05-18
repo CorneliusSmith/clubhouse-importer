@@ -1,7 +1,13 @@
 // const ch = require('clubhouse-lib');
 import Clubhouse, { Epic, File, ID, LinkedFile } from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
-import { ResourceMap, ResourceMaps, StoryForUpload } from './types';
+import {
+  ResourceMap,
+  ResourceMaps,
+  StoryForUpload,
+  StoryLinkMap,
+  StoryLinkResponse,
+} from './types';
 import {
   _getMapObj,
   _resolve,
@@ -29,53 +35,56 @@ export const defaultSettings = {
 // // and identify stories that have previously been migrated.
 const migratedPrefix = '[Migrated:';
 
-// const addStoryLinks = async (settings:) => {
-//   const sourceProjectId = settings
-//     ? settings.source_project
-//     : defaultSettings.SOURCE_PROJECT_ID;
+const addStoryLinks = async (settings: any) => {
+  const sourceProjectId = settings
+    ? settings.source_project
+    : defaultSettings.SOURCE_PROJECT_ID;
 
-//   // Handle mapping for story links (x blocks y, etc)
-//   // This should run AFTER stories have been migrated.
-//   const storiesMap = {};
-//   const allStoryLinks = [];
-//   await sourceApi.listStories(sourceProjectId).then((stories) => {
-//     stories.forEach((s) => {
-//       s.story_links.forEach((link) => {
-//         allStoryLinks.push({
-//           archived: s.archived,
-//           story_to_fix: s.id,
-//           old_subject_id: link.subject_id,
-//           verb: link.verb,
-//           old_object_id: link.object_id,
-//           created_at: link.created_id,
-//           updated_at: link.updated_at,
-//         });
-//       });
-//       // parse out the new id from the old story name, add to the map.
-//       const newId = s.name.split(migratedPrefix).pop().split(']')[0];
-//       storiesMap[s.id] = newId;
-//     });
-//     return stories;
-//   });
+  // Handle mapping for story links (x blocks y, etc)
+  // This should run AFTER stories have been migrated.
+  const storiesMap: StoryLinkMap = {};
+  const allStoryLinks: StoryLinkResponse[] = [];
+  await sourceApi.listStories(sourceProjectId).then((stories) => {
+    stories.forEach((s) => {
+      s.story_links.forEach((link) => {
+        allStoryLinks.push({
+          archived: s.archived,
+          story_to_fix: s.id,
+          old_subject_id: link.subject_id,
+          verb: link.verb,
+          old_object_id: link.object_id,
+          created_at: link.created_at,
+          updated_at: link.updated_at,
+        });
+      });
+      // parse out the new id from the old story name, add to the map.
+      const newID = s.name.split(migratedPrefix).pop();
+      if (newID) {
+        const finalID = newID.split(']')[0];
+        storiesMap[s.id] = finalID;
+      }
+    });
+    return stories;
+  });
 
-//   console.log(
-//     `Creating missing story links for ${allStoryLinks.length} stories`
-//   );
-//   for (const link of allStoryLinks) {
-//     const linkParam = {
-//       object_id: storiesMap[link.old_object_id],
-//       subject_id: storiesMap[link.old_subject_id],
-//       verb: link.verb,
-//     };
-//     console.log(linkParam.subject_id, linkParam.verb, linkParam.object_id);
-//     try {
-//       await targetApi.createStoryLink(linkParam).then(console.log);
-//     } catch (err) {
-//       // Likely already imported.
-//       // console.log(err)
-//     }
-//   }
-// };
+  console.log(
+    `Creating missing story links for ${allStoryLinks.length} stories`
+  );
+  for (const link of allStoryLinks) {
+    const linkParam = {
+      object_id: storiesMap[link.old_object_id],
+      subject_id: storiesMap[link.old_subject_id],
+      verb: link.verb,
+    };
+    console.log(linkParam.subject_id, linkParam.verb, linkParam.object_id);
+    try {
+      await targetApi.createStoryLink(linkParam).then(console.log);
+    } catch (err) {
+      // Likely already imported.
+      console.log(err);
+    }
+  }
+};
 
 const createIterationsFromSource = async () => {
   const existingTargetIters = await targetApi.listIterations().then((iters) => {
