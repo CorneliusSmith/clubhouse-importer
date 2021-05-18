@@ -29,7 +29,7 @@ export const defaultSettings = {
 // // and identify stories that have previously been migrated.
 const migratedPrefix = '[Migrated:';
 
-// const addStoryLinks = async (settings) => {
+// const addStoryLinks = async (settings:) => {
 //   const sourceProjectId = settings
 //     ? settings.source_project
 //     : defaultSettings.SOURCE_PROJECT_ID;
@@ -77,24 +77,24 @@ const migratedPrefix = '[Migrated:';
 //   }
 // };
 
-// const createIterationsFromSource = async (unusedSettings) => {
-//   const existingTargetIters = await targetApi.listIterations().then((iters) => {
-//     return iters.map((iter) => iter.name);
-//   });
+const createIterationsFromSource = async () => {
+  const existingTargetIters = await targetApi.listIterations().then((iters) => {
+    return iters.map((iter) => iter.name);
+  });
 
-//   await sourceApi.listIterations().then((iters) => {
-//     iters.map(async (iter) => {
-//       if (!existingTargetIters.includes(iter.name)) {
-//         const importIter = {
-//           name: iter.name,
-//           start_date: iter.start_date,
-//           end_date: iter.end_date,
-//         };
-//         await targetApi.createIteration(importIter).then(console.log);
-//       }
-//     });
-//   });
-// };
+  await sourceApi.listIterations().then((iters) => {
+    iters.map(async (iter) => {
+      if (!existingTargetIters.includes(iter.name)) {
+        const importIter = {
+          name: iter.name,
+          start_date: iter.start_date,
+          end_date: iter.end_date,
+        };
+        await targetApi.createIteration(importIter).then(console.log);
+      }
+    });
+  });
+};
 
 const importOne = async (settings: any) => {
   const storyId = settings.story;
@@ -393,18 +393,20 @@ const createEpicStories = async (
   });
 };
 
-// const createMilestone = async (milestoneId) => {
-//   await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
-//     const importMilestone = _cleanObj({
-//       name: milestone.name,
-//       categories: milestone.categories,
-//       started_at_override: milestone.started_at_override,
-//       completed_at_override: milestone.completed_at_override,
-//       state: milestone.state,
-//     });
-//     await targetApi.createMilestone(importMilestone).then(console.log());
-//   });
-// };
+const createMilestone = async (milestoneId: ID) => {
+  await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
+    const importMilestone = _cleanObj({
+      name: milestone.name,
+      categories: milestone.categories,
+      started_at_override: milestone.started_at_override,
+      completed_at_override: milestone.completed_at_override,
+      state: milestone.state,
+    });
+    await targetApi
+      .createMilestone(importMilestone)
+      .then((milestone) => console.log(`Created Milestone ${milestone.name}`));
+  });
+};
 
 // const importAllLabels = async () => {
 //   // toImport = [];
