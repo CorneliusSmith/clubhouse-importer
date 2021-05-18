@@ -1,12 +1,26 @@
 // const ch = require('clubhouse-lib');
-import Clubhouse, { ID, Iteration, Member, Workflow } from 'clubhouse-lib';
+import Clubhouse, {
+  File,
+  ID,
+  Iteration,
+  LinkedFile,
+  Member,
+  Story,
+  StoryChange,
+  Workflow,
+} from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
 import { type } from 'os';
-import { _getMapObj, _resolve } from './utils';
+import { ResourceMap, ResourceMaps, StoryForUpload } from './types';
+import {
+  _getMapObj,
+  _resolve,
+  _cleanObj,
+  mapStoryToStoryChange,
+} from './utils';
 dotenv.config();
 
 // API Clients per workspace
-console.log(process.env.CLUBHOUSE_API_TOKEN_SOURCE);
 const sourceApi = Clubhouse.create(
   process.env.CLUBHOUSE_API_TOKEN_SOURCE || ''
 );
@@ -92,28 +106,37 @@ const migratedPrefix = '[Migrated:';
 //   });
 // };
 
-// const importOne = async (settings) => {
-//   const storyId = settings.story;
-//   const targetProjectId =
-//     settings.target_project || defaultSettings.TARGET_PROJECT_ID;
-//   const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
+const importOne = async (settings: any) => {
+  const storyId = settings.story;
+  const targetProjectId =
+    settings.target_project || defaultSettings.TARGET_PROJECT_ID;
+  const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
 
-//   const resourceMaps = await getResourceMaps();
-//   const newStory = await getStoryForImport(
-//     storyId,
-//     resourceMaps,
-//     targetProjectId,
-//     targetEpicId
-//   );
-//   const linked_file_ids = await uploadFiles(newStory.create.files);
-//   for (const linked_file_id in linked_file_ids) {
-//     if (linked_file_id) {
-//       newStory.create.linked_file_ids.push(linked_file_ids[linked_file_id]);
-//     }
-//   }
+  const resourceMaps = await getResourceMaps();
+  const newStory = await getStoryForImport(
+    storyId,
+    resourceMaps,
+    targetProjectId,
+    targetEpicId
+  );
+  if (newStory.create.files) {
+    const linked_file_ids = await uploadFiles(
+      newStory.create.files,
+      resourceMaps.members
+    );
+    for (const linked_file_id in linked_file_ids) {
+      if (linked_file_id) {
+        newStory.create.linked_file_ids.push(linked_file_ids[linked_file_id]);
+      }
+    }
+  }
 
-//   await updateStory(newStory);
-// };
+  newStory.create = mapStoryToStoryChange(
+    newStory.create,
+    newStory.create.linked_file_ids
+  );
+  await updateStory(newStory);
+};
 
 // const importAll = async (settings) => {
 //   const sourceProjectId =
@@ -153,106 +176,113 @@ const migratedPrefix = '[Migrated:';
 //   }
 // };
 
-// const updateStory = async (newStory) => {
-//   if (!newStory.create.name.startsWith(migratedPrefix)) {
-//     delete newStory.create.files;
-//     console.log('Want To Create:', newStory.create.name);
-//     await targetApi.createStory(newStory.create).then(async (res) => {
-//       console.log(`Created new story #${res.id}: ${res.name}`);
-//       console.log(` - - via old source story #${newStory.id}`);
-//       // const origDescription = newStory.create.description || '';
-//       // const updateSource = {
-//       //   name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
-//       //   description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
-//       // };
+async function updateStory(newStory: StoryForUpload) {
+  if (
+    newStory.create.name &&
+    !newStory.create.name.startsWith(migratedPrefix)
+  ) {
+    console.log(newStory);
+    console.log('Want To Create:', newStory.create.name);
+    await targetApi.createStory(newStory.create).then(async (res) => {
+      console.log(`Created new story #${res.id}: ${res.name}`);
+      console.log(` - - via old source story #${newStory.id}`);
+      // const origDescription = newStory.create.description || '';
+      // const updateSource = {
+      //   name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
+      //   description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
+      // };
 
-//       // await sourceApi.updateStory(newStory.id, updateSource).then(console.log);
-//     });
-//   } else {
-//     console.log(
-//       `....We have already migrated this story... ~ ${newStory.create.name}`
-//     );
-//   }
-// };
+      // await sourceApi.updateStory(newStory.id, updateSource).then(console.log);
+    });
+  } else {
+    console.log(
+      `....We have already migrated this story... ~ ${newStory.create.name}`
+    );
+  }
+}
 
-// const getStoryForImport = async (storyId, resourceMaps, projectId, epicId) => {
-//   const members = resourceMaps.members;
-//   const iterations = resourceMaps.iterations;
-//   const workflows = resourceMaps.workflows;
+const getStoryForImport = async (
+  storyId: number,
+  resourceMaps: ResourceMaps,
+  projectId: number,
+  epicId: number
+) => {
+  const members = resourceMaps.members;
+  const iterations = resourceMaps.iterations;
+  const workflows = resourceMaps.workflows;
 
-//   const s = await sourceApi.getStory(storyId).then((sty) => {
-//     console.log(`Fetched source story #${sty.id} - ${sty.name}`);
-//     return sty;
-//   });
+  const s = await sourceApi.getStory(storyId).then((sty) => {
+    console.log(`Fetched source story #${sty.id} - ${sty.name}`);
+    return sty;
+  });
 
-//   const linked_file_ids = await uploadFiles(s.linked_files);
+  const linked_file_ids = await uploadFiles(s.linked_files, members);
 
-//   const sourceComments = s.comments.map((c) => {
-//     return {
-//       author_id: members[c.author_id],
-//       created_at: c.created_at,
-//       updated_at: c.updated_at,
-//       text: c.text,
-//     };
-//   });
-//   const sourceTasks = s.tasks.map((t) => {
-//     return {
-//       // a task is "complete" not "completed" like stories.
-//       complete: t.complete,
-//       owner_ids: mapMembers(t.owner_ids, members),
-//       created_at: t.created_at,
-//       updated_at: t.updated_at,
-//       description: t.description,
-//     };
-//   });
+  const sourceComments = s.comments.map((c) => {
+    return {
+      author_id: c.author_id ? members[c.author_id] : undefined,
+      created_at: c.created_at,
+      updated_at: c.updated_at,
+      text: c.text,
+    };
+  });
+  const sourceTasks = s.tasks.map((t) => {
+    return {
+      // a task is "complete" not "completed" like stories.
+      complete: t.complete,
+      owner_ids: mapMembers(t.owner_ids, members),
+      created_at: t.created_at,
+      updated_at: t.updated_at,
+      description: t.description,
+    };
+  });
+  const newStory = {
+    archived: s.archived,
+    comments: sourceComments,
+    completed_at_override: s.completed_at_override,
+    created_at: s.created_at,
+    deadline: s.deadline,
+    description: s.description,
+    epic_id: epicId,
+    estimate: s.estimate,
+    external_id: s.app_url,
+    external_links: s.external_links,
+    follower_ids: mapMembers(s.follower_ids, members),
+    iteration_id: s.iteration_id ? iterations[s.iteration_id] : undefined,
+    name: s.name,
+    labels: s.labels.map((label) => {
+      return {
+        name: label.name,
+      };
+    }),
+    files: s.files, //This causes error. Get fileId before create stoy, set this to be empty and then after story is created in target api call get file and update the target story to upload the file
+    linked_file_ids,
+    owner_ids: mapMembers(s.owner_ids, members),
+    project_id: projectId,
+    requested_by_id: members[s.requested_by_id],
+    started_at_override: s.started_at_override,
+    story_type: s.story_type,
+    tasks: sourceTasks,
+    updated_at: s.updated_at,
+    // workflow_state_id: 500000956,
+  };
 
-//   const newStory = {
-//     archived: s.archived,
-//     comments: sourceComments,
-//     completed_at_override: s.created_at_override,
-//     created_at: s.created_at,
-//     deadline: s.deadline,
-//     description: s.description,
-//     epic_id: epicId,
-//     estimate: s.estimate,
-//     external_id: s.app_url,
-//     external_links: s.external_links,
-//     follower_ids: mapMembers(s.follower_ids, members),
-//     iteration_id: iterations[s.iteration_id],
-//     name: s.name,
-//     labels: s.labels.map((label) => {
-//       return {
-//         name: label.name,
-//       };
-//     }),
-//     files: s.files, //This causes error. Get fileId before create stoy, set this to be empty and then after story is created in target api call get file and update the target story to upload the file
-//     linked_file_ids,
-//     owner_ids: mapMembers(s.owner_ids, members),
-//     project_id: projectId,
-//     requested_by_id: members[s.requested_by_id],
-//     started_at_override: s.started_at_override,
-//     story_type: s.story_type,
-//     tasks: sourceTasks,
-//     updated_at: s.updated_at,
-//     // workflow_state_id: 500000956,
-//   };
+  return {
+    id: s.id,
+    create: _cleanObj(newStory),
+  };
+};
 
-//   return {
-//     id: s.id,
-//     create: _cleanObj(newStory),
-//   };
-// };
-
-// const mapMembers = (oldMemberIds, membersMap) => {
-//   const memberIds = [];
-//   oldMemberIds.forEach((o_id) => {
-//     const newId = membersMap[o_id];
-//     if (newId) {
-//       memberIds.push(newId);
-//     }
-//   });
-//   return memberIds;
-// };
+const mapMembers = (oldMemberIds: ID[], membersMap: ResourceMap) => {
+  const memberIds: ID[] = [];
+  oldMemberIds.forEach((o_id) => {
+    const newId = membersMap[o_id];
+    if (newId) {
+      memberIds.push(newId);
+    }
+  });
+  return memberIds;
+};
 
 /* Create objects mapping old workspace ids to new workspace ids for
    member, iterataion, and workflow resources
@@ -390,23 +420,24 @@ const getResourceMaps = async () => {
 //   });
 // };
 
-// async function uploadFiles(files) {
-//   const fileIDs = [];
-//   for (const file in files) {
-//     if (file) {
-//       const fileForUpload = files[file];
-//       const uploadFile = await targetApi.createLinkedFile({
-//         name: fileForUpload.name,
-//         type: 'url',
-//         description: fileForUpload.description,
-//         content_type: fileForUpload.content_type,
-//         url: fileForUpload.url,
-//       });
-//       fileIDs.push(uploadFile.id);
-//     }
-//   }
-//   return fileIDs;
-// }
+async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
+  const fileIDs = [];
+  for (const file in files) {
+    if (file) {
+      const fileForUpload = files[file];
+      const uploadFile = await targetApi.createLinkedFile({
+        name: fileForUpload.name,
+        type: 'url',
+        description: fileForUpload.description || '',
+        content_type: fileForUpload.content_type || '',
+        url: fileForUpload.url || '',
+        uploader_id: members[fileForUpload.uploader_id],
+      });
+      fileIDs.push(uploadFile.id);
+    }
+  }
+  return fileIDs;
+}
 
 // module.exports = {
 //   importAll,
@@ -422,4 +453,4 @@ const getResourceMaps = async () => {
 // require('make-runnable/custom')({
 //   printOutputFrame: false,
 // });
-getResourceMaps();
+importOne({ story: 17461 });

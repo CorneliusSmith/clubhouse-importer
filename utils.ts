@@ -1,4 +1,4 @@
-import Client, { Iteration, Member, Workflow } from 'clubhouse-lib';
+import Client, { ID, Iteration, Member, Story, Workflow } from 'clubhouse-lib';
 import { ResourceMap } from './types';
 
 /* Utility to do a deep resolution of a nested object key */
@@ -78,4 +78,32 @@ export async function _getMapObj(
     }
   );
   return mapSourceToTargetIds;
+}
+
+export function mapStoryToStoryChange(story: any, linked_file_ids: ID[]) {
+  const storyChange = {
+    archived: story.archived,
+    comments: story.comments,
+    completed_at_override: story.completed_at_override,
+    created_at: story.created_at,
+    deadline: story.deadline,
+    description: story.description,
+    epic_id: story.epic_id,
+    estimate: story.estimate,
+    external_id: story.app_url,
+    external_links: story.external_links,
+    follower_ids: story.follower_ids,
+    iteration_id: story.iteration_id,
+    name: story.name,
+    labels: story.labels,
+    linked_file_ids,
+    owner_ids: story.owner_ids,
+    project_id: story.project_id,
+    requested_by_id: story.requested_by_id,
+    started_at_override: story.started_at_override,
+    story_type: story.story_type,
+    tasks: story.tasks,
+    updated_at: story.updated_at,
+  };
+  return _cleanObj(storyChange);
 }
