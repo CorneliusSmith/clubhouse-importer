@@ -1,4 +1,3 @@
-// const ch = require('clubhouse-lib');
 import Clubhouse, { Epic, File, ID, LinkedFile } from 'clubhouse-lib';
 import * as dotenv from 'dotenv';
 import {
@@ -13,6 +12,7 @@ import {
   _resolve,
   _cleanObj,
   mapStoryToStoryChange,
+  getResourceMaps,
 } from './utils';
 dotenv.config();
 
@@ -21,13 +21,13 @@ const sourceApi = Clubhouse.create(
   process.env.CLUBHOUSE_API_TOKEN_SOURCE || ''
 );
 const targetApi = Clubhouse.create(
-  process.env.CLUBHOUSE_API_TOKEN_TARGET || ''
+  process.env.CLUBHOUSE_API_TOKEN_SILVER_ORANGE_AND_SMALLS || ''
 );
 
 export const defaultSettings = {
   // TODO: move to args
   SOURCE_PROJECT_ID: 12584,
-  TARGET_PROJECT_ID: 12683,
+  TARGET_PROJECT_ID: 18775,
   TARGET_EPIC_ID: 14924,
 };
 
@@ -105,13 +105,13 @@ const createIterationsFromSource = async () => {
   });
 };
 
-const importOne = async (settings: any) => {
+export const importOne = async (settings: any) => {
   const storyId = settings.story;
   const targetProjectId =
     settings.target_project || defaultSettings.TARGET_PROJECT_ID;
   const targetEpicId = settings.target_epic || defaultSettings.TARGET_EPIC_ID;
 
-  const resourceMaps = await getResourceMaps();
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
   const newStory = await getStoryForImport(
     storyId,
     resourceMaps,
@@ -155,7 +155,7 @@ const importAll = async (settings: any) => {
     });
   console.log(sourceStoryIds);
 
-  const resourceMaps = await getResourceMaps();
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
 
   const toImport = [];
   for (const storyId of sourceStoryIds) {
@@ -215,7 +215,7 @@ const getStoryForImport = async (
   });
 
   const linked_file_ids = await uploadFiles(s.linked_files, members);
-
+  const description = `Migrated From:${s.app_url}\n\n${s.description}`;
   const sourceComments = s.comments.map((c) => {
     return {
       author_id: c.author_id ? members[c.author_id] : undefined,
@@ -224,6 +224,7 @@ const getStoryForImport = async (
       text: c.text,
     };
   });
+
   const sourceTasks = s.tasks.map((t) => {
     return {
       // a task is "complete" not "completed" like stories.
@@ -240,7 +241,7 @@ const getStoryForImport = async (
     completed_at_override: s.completed_at_override,
     created_at: s.created_at,
     deadline: s.deadline,
-    description: s.description,
+    description: description,
     epic_id: epicId,
     estimate: s.estimate,
     external_id: s.app_url,
@@ -282,44 +283,8 @@ const mapMembers = (oldMemberIds: ID[], membersMap: ResourceMap) => {
   return memberIds;
 };
 
-/* Create objects mapping old workspace ids to new workspace ids for
-   member, iterataion, and workflow resources
-   TODO: do this for epics too.
-*/
-const getResourceMaps = async (): Promise<ResourceMaps> => {
-  const membersMap = await _getMapObj(
-    sourceApi,
-    targetApi,
-    'listMembers',
-    'profile.email_address'
-  );
-  const itersMap = await _getMapObj(
-    sourceApi,
-    targetApi,
-    'listIterations',
-    'name'
-  );
-  const wfMap = await _getMapObj(
-    sourceApi,
-    targetApi,
-    'listWorkflows',
-    'name',
-    'states'
-  );
-  console.log({
-    members: membersMap,
-    iterations: itersMap,
-    workflows: wfMap,
-  });
-  return {
-    members: membersMap,
-    iterations: itersMap,
-    workflows: wfMap,
-  };
-};
-
-const importEpic = async (sourceEpicId: ID) => {
-  const resourceMaps = await getResourceMaps();
+export const importEpic = async (sourceEpicId: ID) => {
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
 
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
     //create labels
@@ -338,10 +303,14 @@ const importEpic = async (sourceEpicId: ID) => {
     const follower_ids = epic.follower_ids.map((id) => idMap[id]);
     const requested_by_id = idMap[epic.requested_by_id];
 
+    const description = `Migrated From:${epic.app_url}\n\n${epic.description}`;
+
     const importEpic = {
       created_at: epic.created_at,
+      completed_at_override: epic.completed_at,
+      started_at_override: epic.started_at,
       deadline: epic.deadline,
-      description: epic.description,
+      description,
       follower_ids,
       group_id: epic.group_id,
       labels: labelsToAdd,
@@ -358,20 +327,23 @@ const importEpic = async (sourceEpicId: ID) => {
   });
 };
 
-const importAllEpics = async (projectId: number) => {
+export async function importAllEpics() {
   //TODO: filter out epics with emrap labels
   const epicIds = await sourceApi.listEpics().then(async (epics) => {
     const reducedEpics = epics.reduce((res: Epic[], epic) => {
-      if (epic.project_ids.includes(projectId)) {
-        res.push(epic);
+      for (const label in epic.labels) {
+        if (epic.labels[label].name === 'Moved to New Workspace') {
+          res.push(epic);
+        }
       }
       return res;
     }, []);
     return reducedEpics.map((e) => e.id);
   });
+  console.log(epicIds);
   epicIds.forEach((epicId) => importEpic(epicId));
   return 'Done Importing Epics';
-};
+}
 
 const createEpicStories = async (
   sourceEpicId: ID,
@@ -465,7 +437,6 @@ async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
 //   importAllLabels,
 // };
 
-// require('make-runnable/custom')({
-//   printOutputFrame: false,
-// });
-importEpic(8309);
+require('make-runnable/custom')({
+  printOutputFrame: false,
+});

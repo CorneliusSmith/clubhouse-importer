@@ -15,9 +15,9 @@ export type ResourceMaps = {
 };
 
 interface StoryUpload extends StoryChange {
-  comments: Array<Comment>;
-  external_links: Array<string>;
-  tasks: Array<Task>;
+  comments: Comment[];
+  external_links: String[];
+  tasks: Task[];
 }
 export type StoryForUpload = {
   id: number;

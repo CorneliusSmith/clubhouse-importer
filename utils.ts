@@ -107,3 +107,42 @@ export function mapStoryToStoryChange(story: any, linked_file_ids: ID[]) {
   };
   return _cleanObj(storyChange);
 }
+
+/* Create objects mapping old workspace ids to new workspace ids for
+   member, iterataion, and workflow resources
+   TODO: do this for epics too.
+*/
+export async function getResourceMaps(
+  sourceApi: Client<RequestInfo, Response>,
+  targetApi: Client<RequestInfo, Response>
+) {
+  const membersMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listMembers',
+    'profile.email_address'
+  );
+  const itersMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listIterations',
+    'name'
+  );
+  const wfMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listWorkflows',
+    'name',
+    'states'
+  );
+  console.log({
+    members: membersMap,
+    iterations: itersMap,
+    workflows: wfMap,
+  });
+  return {
+    members: membersMap,
+    iterations: itersMap,
+    workflows: wfMap,
+  };
+}
