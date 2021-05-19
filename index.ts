@@ -13,6 +13,7 @@ import {
   _cleanObj,
   mapStoryToStoryChange,
   getResourceMaps,
+  mapMembers,
 } from './utils';
 dotenv.config();
 
@@ -35,7 +36,7 @@ export const defaultSettings = {
 // // and identify stories that have previously been migrated.
 const migratedPrefix = '[Migrated:';
 
-const addStoryLinks = async (settings: any) => {
+export async function addStoryLinks(settings: any) {
   const sourceProjectId = settings
     ? settings.source_project
     : defaultSettings.SOURCE_PROJECT_ID;
@@ -84,9 +85,9 @@ const addStoryLinks = async (settings: any) => {
       console.log(err);
     }
   }
-};
+}
 
-const createIterationsFromSource = async () => {
+export async function createIterationsFromSource() {
   const existingTargetIters = await targetApi.listIterations().then((iters) => {
     return iters.map((iter) => iter.name);
   });
@@ -103,9 +104,9 @@ const createIterationsFromSource = async () => {
       }
     });
   });
-};
+}
 
-export const importOne = async (settings: any) => {
+export async function importOne(settings: any) {
   const storyId = settings.story;
   const targetProjectId =
     settings.target_project || defaultSettings.TARGET_PROJECT_ID;
@@ -135,9 +136,9 @@ export const importOne = async (settings: any) => {
     newStory.create.linked_file_ids
   );
   await updateStory(newStory);
-};
+}
 
-const importAll = async (settings: any) => {
+export async function importAll(settings: any) {
   const sourceProjectId =
     settings.source_project || defaultSettings.SOURCE_PROJECT_ID;
   const targetProjectId =
@@ -173,9 +174,9 @@ const importAll = async (settings: any) => {
   for (const newStory of toImport) {
     await updateStory(newStory);
   }
-};
+}
 
-async function updateStory(newStory: StoryForUpload) {
+export async function updateStory(newStory: StoryForUpload) {
   if (
     newStory.create.name &&
     !newStory.create.name.startsWith(migratedPrefix)
@@ -199,12 +200,12 @@ async function updateStory(newStory: StoryForUpload) {
   }
 }
 
-const getStoryForImport = async (
+export async function getStoryForImport(
   storyId: number,
   resourceMaps: ResourceMaps,
   projectId: ID,
   epicId: ID
-) => {
+) {
   const members = resourceMaps.members;
   const iterations = resourceMaps.iterations;
   const workflows = resourceMaps.workflows;
@@ -270,20 +271,9 @@ const getStoryForImport = async (
     id: s.id,
     create: _cleanObj(newStory),
   };
-};
+}
 
-const mapMembers = (oldMemberIds: ID[], membersMap: ResourceMap) => {
-  const memberIds: ID[] = [];
-  oldMemberIds.forEach((o_id) => {
-    const newId = membersMap[o_id];
-    if (newId) {
-      memberIds.push(newId);
-    }
-  });
-  return memberIds;
-};
-
-export const importEpic = async (sourceEpicId: ID) => {
+export async function importEpic(sourceEpicId: ID) {
   const resourceMaps = await getResourceMaps(sourceApi, targetApi);
 
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
@@ -325,7 +315,7 @@ export const importEpic = async (sourceEpicId: ID) => {
       createEpicStories(sourceEpicId, epic.id, resourceMaps);
     }); //silverorange is source, test is target
   });
-};
+}
 
 export async function importAllEpics() {
   //TODO: filter out epics with emrap labels
@@ -389,7 +379,7 @@ const createMilestone = async (milestoneId: ID) => {
   });
 };
 
-const importAllLabels = async () => {
+export async function importAllLabels() {
   // toImport = [];
   const existingLabels = await targetApi.listLabels().then((labels) => {
     return labels.map((label) => label.name.toLowerCase());
@@ -405,7 +395,7 @@ const importAllLabels = async () => {
       }
     });
   });
-};
+}
 
 async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
   const fileIDs = [];
@@ -425,17 +415,6 @@ async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
   }
   return fileIDs;
 }
-
-// module.exports = {
-//   importAll,
-//   importOne,
-//   linkStories: addStoryLinks,
-//   addIterations: createIterationsFromSource,
-//   importAllEpics,
-//   importEpic,
-//   createMilestone,
-//   importAllLabels,
-// };
 
 require('make-runnable/custom')({
   printOutputFrame: false,

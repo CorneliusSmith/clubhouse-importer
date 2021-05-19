@@ -135,14 +135,21 @@ export async function getResourceMaps(
     'name',
     'states'
   );
-  console.log({
-    members: membersMap,
-    iterations: itersMap,
-    workflows: wfMap,
-  });
+
   return {
     members: membersMap,
     iterations: itersMap,
     workflows: wfMap,
   };
+}
+
+export function mapMembers(oldMemberIds: ID[], membersMap: ResourceMap) {
+  const memberIds: ID[] = [];
+  oldMemberIds.forEach((o_id) => {
+    const newId = membersMap[o_id];
+    if (newId) {
+      memberIds.push(newId);
+    }
+  });
+  return memberIds;
 }
