@@ -29,7 +29,7 @@ export const defaultSettings = {
   // TODO: move to args
   SOURCE_PROJECT_ID: 12584,
   TARGET_PROJECT_ID: 18775,
-  TARGET_EPIC_ID: 14924,
+  TARGET_EPIC_ID: 'input epic id',
 };
 
 // // Used to update story names that have been migrated from the source workspace
@@ -119,16 +119,9 @@ export async function importOne(settings: any) {
     targetProjectId,
     targetEpicId
   );
+
   if (newStory.create.files) {
-    const linked_file_ids = await uploadFiles(
-      newStory.create.files,
-      resourceMaps.members
-    );
-    for (const linked_file_id in linked_file_ids) {
-      if (linked_file_id) {
-        newStory.create.linked_file_ids.push(linked_file_ids[linked_file_id]);
-      }
-    }
+    newStory.create = await convertFilesToLinkedFiles(newStory, resourceMaps);
   }
 
   newStory.create = mapStoryToStoryChange(
@@ -177,21 +170,24 @@ export async function importAll(settings: any) {
 }
 
 export async function updateStory(newStory: StoryForUpload) {
-  if (
-    newStory.create.name &&
-    !newStory.create.name.startsWith(migratedPrefix)
-  ) {
+  if (newStory.create.name && !newStory.create.name.includes(migratedPrefix)) {
     console.log('Want To Create:', newStory.create.name);
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
       console.log(` - - via old source story #${newStory.id}`);
-      // const origDescription = newStory.create.description || '';
-      // const updateSource = {
-      //   name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
-      //   description: `${origDescription}\n\n** Migrated to ${res.app_url} **`,
-      // };
+      let origDescription = newStory.create.description?.split('\n') || [];
+      origDescription =
+        origDescription !== []
+          ? origDescription.slice(1, origDescription.length)
+          : [];
+      const updateSource = {
+        name: `${migratedPrefix}${res.id}] ${newStory.create.name}`,
+        description: `${origDescription.join('\n')}\n\n** Migrated To: ${
+          res.app_url
+        } **`,
+      };
 
-      // await sourceApi.updateStory(newStory.id, updateSource).then(console.log);
+      await sourceApi.updateStory(newStory.id, updateSource);
     });
   } else {
     console.log(
@@ -216,7 +212,7 @@ export async function getStoryForImport(
   });
 
   const linked_file_ids = await uploadFiles(s.linked_files, members);
-  const description = `Migrated From:${s.app_url}\n\n${s.description}`;
+  const description = `** Migrated From: ${s.app_url} **\n\n${s.description}`;
   const sourceComments = s.comments.map((c) => {
     return {
       author_id: c.author_id ? members[c.author_id] : undefined,
@@ -289,11 +285,12 @@ export async function importEpic(sourceEpicId: ID) {
       'listMembers',
       'profile.email_address'
     );
+
     const owner_ids = epic.owner_ids.map((id) => idMap[id]);
     const follower_ids = epic.follower_ids.map((id) => idMap[id]);
     const requested_by_id = idMap[epic.requested_by_id];
 
-    const description = `Migrated From:${epic.app_url}\n\n${epic.description}`;
+    const description = `** Migrated From:${epic.app_url} **\n\n${epic.description}`;
 
     const importEpic = {
       created_at: epic.created_at,
@@ -335,11 +332,11 @@ export async function importAllEpics() {
   return 'Done Importing Epics';
 }
 
-const createEpicStories = async (
+export async function createEpicStories(
   sourceEpicId: ID,
   targetEpicId: ID,
   resourceMaps: ResourceMaps
-) => {
+) {
   const targetProjectId = defaultSettings.TARGET_PROJECT_ID;
 
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
@@ -355,6 +352,14 @@ const createEpicStories = async (
         targetProjectId,
         targetEpicId
       );
+
+      if (fetchedStory.create.files) {
+        fetchedStory.create = await convertFilesToLinkedFiles(
+          fetchedStory,
+          resourceMaps
+        );
+      }
+
       fetchedStory.create = mapStoryToStoryChange(
         fetchedStory.create,
         fetchedStory.create.linked_file_ids
@@ -362,7 +367,7 @@ const createEpicStories = async (
       updateStory(fetchedStory);
     });
   });
-};
+}
 
 const createMilestone = async (milestoneId: ID) => {
   await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
@@ -414,6 +419,24 @@ async function uploadFiles(files: File[] | LinkedFile[], members: ResourceMap) {
     }
   }
   return fileIDs;
+}
+
+async function convertFilesToLinkedFiles(
+  story: any,
+  resourceMaps: ResourceMaps
+) {
+  const linked_file_ids = await uploadFiles(
+    story.create.files,
+    resourceMaps.members
+  );
+
+  for (const linked_file_id in linked_file_ids) {
+    if (linked_file_id) {
+      story.create.linked_file_ids.push(linked_file_ids[linked_file_id]);
+    }
+  }
+
+  return story.create;
 }
 
 require('make-runnable/custom')({
