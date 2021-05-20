@@ -1,4 +1,6 @@
 import Clubhouse, { Epic, File, ID, LinkedFile } from 'clubhouse-lib';
+import { RateLimiter } from 'limiter';
+
 import * as dotenv from 'dotenv';
 import {
   ResourceMap,
@@ -15,7 +17,10 @@ import {
   getResourceMaps,
   mapMembers,
 } from './utils';
+
 dotenv.config();
+
+const limiter = new RateLimiter({ tokensPerInterval: 200, interval: 'minute' });
 
 // API Clients per workspace
 const sourceApi = Clubhouse.create(
@@ -308,6 +313,8 @@ export async function importEpic(sourceEpicId: ID) {
       state: epic.state,
       updated_at: epic.updated_at,
     };
+    const remainingRequests = await limiter.removeTokens(1);
+    console.log(remainingRequests);
     await targetApi.createEpic(importEpic).then(async (epic) => {
       createEpicStories(sourceEpicId, epic.id, resourceMaps);
     }); //silverorange is source, test is target
@@ -339,6 +346,8 @@ export async function createEpicStories(
 ) {
   const targetProjectId = defaultSettings.TARGET_PROJECT_ID;
 
+  const remainingRequests = await limiter.removeTokens(1);
+  console.log(remainingRequests);
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
     const epicStoryIds = await sourceApi
       .listEpicStories(epic.id)
@@ -346,6 +355,8 @@ export async function createEpicStories(
         return stories.map((s) => s.id);
       });
     epicStoryIds.forEach(async (story) => {
+      const remainingRequests = await limiter.removeTokens(1);
+      console.log(remainingRequests);
       const fetchedStory = await getStoryForImport(
         story,
         resourceMaps,
@@ -425,6 +436,8 @@ async function convertFilesToLinkedFiles(
   story: any,
   resourceMaps: ResourceMaps
 ) {
+  const remainingRequests = await limiter.removeTokens(1);
+  console.log(remainingRequests);
   const linked_file_ids = await uploadFiles(
     story.create.files,
     resourceMaps.members
@@ -437,6 +450,15 @@ async function convertFilesToLinkedFiles(
   }
 
   return story.create;
+}
+
+export async function importMissingEpicStories(settings: {
+  sourceEpicID: ID;
+  targetEpicID: ID;
+}) {
+  console.log(settings.sourceEpicID, settings.targetEpicID);
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
+  createEpicStories(settings.sourceEpicID, settings.targetEpicID, resourceMaps);
 }
 
 require('make-runnable/custom')({
