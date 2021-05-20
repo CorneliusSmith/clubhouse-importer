@@ -110,7 +110,6 @@ export function mapStoryToStoryChange(story: any, linked_file_ids: ID[]) {
 
 /* Create objects mapping old workspace ids to new workspace ids for
    member, iterataion, and workflow resources
-   TODO: do this for epics too.
 */
 export async function getResourceMaps(
   sourceApi: Client<RequestInfo, Response>,

@@ -27,13 +27,13 @@ const sourceApi = Clubhouse.create(
   process.env.CLUBHOUSE_API_TOKEN_SOURCE || ''
 );
 const targetApi = Clubhouse.create(
-  process.env.CLUBHOUSE_API_TOKEN_SILVER_ORANGE_AND_SMALLS || ''
+  process.env.CLUBHOUSE_API_TOKEN_COURSEHOST || ''
 );
 
 export const defaultSettings = {
   // TODO: move to args
   SOURCE_PROJECT_ID: 12584,
-  TARGET_PROJECT_ID: 18775,
+  TARGET_PROJECT_ID: 18774,
   TARGET_EPIC_ID: 'input epic id',
 };
 
@@ -177,6 +177,8 @@ export async function importAll(settings: any) {
 export async function updateStory(newStory: StoryForUpload) {
   if (newStory.create.name && !newStory.create.name.includes(migratedPrefix)) {
     console.log('Want To Create:', newStory.create.name);
+    const remainingRequests = await limiter.removeTokens(1);
+    console.log('REMAINING REQUESTS:' + remainingRequests);
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
       console.log(` - - via old source story #${newStory.id}`);
@@ -191,7 +193,8 @@ export async function updateStory(newStory: StoryForUpload) {
           res.app_url
         } **`,
       };
-
+      const remainingRequests = await limiter.removeTokens(1);
+      console.log('REMAINING REQUESTS:' + remainingRequests);
       await sourceApi.updateStory(newStory.id, updateSource);
     });
   } else {
@@ -314,7 +317,7 @@ export async function importEpic(sourceEpicId: ID) {
       updated_at: epic.updated_at,
     };
     const remainingRequests = await limiter.removeTokens(1);
-    console.log(remainingRequests);
+    console.log('REMAINING REQUESTS:' + remainingRequests);
     await targetApi.createEpic(importEpic).then(async (epic) => {
       createEpicStories(sourceEpicId, epic.id, resourceMaps);
     }); //silverorange is source, test is target
@@ -323,10 +326,11 @@ export async function importEpic(sourceEpicId: ID) {
 
 export async function importAllEpics() {
   //TODO: filter out epics with emrap labels
+  console.log(targetApi);
   const epicIds = await sourceApi.listEpics().then(async (epics) => {
     const reducedEpics = epics.reduce((res: Epic[], epic) => {
       for (const label in epic.labels) {
-        if (epic.labels[label].name === 'Moved to New Workspace') {
+        if (epic.labels[label].name === 'moved to coursehost WS') {
           res.push(epic);
         }
       }
@@ -347,7 +351,7 @@ export async function createEpicStories(
   const targetProjectId = defaultSettings.TARGET_PROJECT_ID;
 
   const remainingRequests = await limiter.removeTokens(1);
-  console.log(remainingRequests);
+  console.log('REMAINING REQUESTS:' + remainingRequests);
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
     const epicStoryIds = await sourceApi
       .listEpicStories(epic.id)
@@ -356,7 +360,7 @@ export async function createEpicStories(
       });
     epicStoryIds.forEach(async (story) => {
       const remainingRequests = await limiter.removeTokens(1);
-      console.log(remainingRequests);
+      console.log('REMAINING REQUESTS:' + remainingRequests);
       const fetchedStory = await getStoryForImport(
         story,
         resourceMaps,
@@ -437,7 +441,7 @@ async function convertFilesToLinkedFiles(
   resourceMaps: ResourceMaps
 ) {
   const remainingRequests = await limiter.removeTokens(1);
-  console.log(remainingRequests);
+  console.log('REMAINING REQUESTS:' + remainingRequests);
   const linked_file_ids = await uploadFiles(
     story.create.files,
     resourceMaps.members
@@ -459,6 +463,32 @@ export async function importMissingEpicStories(settings: {
   console.log(settings.sourceEpicID, settings.targetEpicID);
   const resourceMaps = await getResourceMaps(sourceApi, targetApi);
   createEpicStories(settings.sourceEpicID, settings.targetEpicID, resourceMaps);
+}
+
+export async function importEpicComments(settings: {
+  sourceEpicID: ID;
+  targetEpicID: ID;
+}) {
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
+  const membersMap = resourceMaps.members;
+  const remainingRequests = await limiter.removeTokens(1);
+  console.log('REMAINING REQUESTS:' + remainingRequests);
+  const comments = await sourceApi.listEpicComments(settings.sourceEpicID);
+  if (comments) {
+    comments.map(async (c) => {
+      const commentChange = {
+        author_id: c.author_id ? membersMap[c.author_id] : null,
+        created_at: c.created_at,
+        updated_at: c.updated_at,
+        text: c.text,
+      };
+      console.log(commentChange);
+      const remainingRequests = await limiter.removeTokens(1);
+      console.log('REMAINING REQUESTS:' + remainingRequests);
+      await targetApi.createEpicComment(settings.targetEpicID, commentChange);
+    });
+  }
+  return 'Done Importing Epic Comments';
 }
 
 require('make-runnable/custom')({
