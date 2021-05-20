@@ -487,8 +487,9 @@ export async function importEpicComments(settings: {
       console.log('REMAINING REQUESTS:' + remainingRequests);
       await targetApi.createEpicComment(settings.targetEpicID, commentChange);
     });
+    return 'Done Importing Epic Comments';
   }
-  return 'Done Importing Epic Comments';
+  return 'No Epic Comments To Import';
 }
 
 require('make-runnable/custom')({
