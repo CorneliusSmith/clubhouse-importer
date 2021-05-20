@@ -485,7 +485,6 @@ export async function importEpicComments(settings: {
         updated_at: c.updated_at,
         text: c.text,
       };
-      console.log(commentChange);
       const remainingRequests = await limiter.removeTokens(1);
       console.log('REMAINING REQUESTS:' + remainingRequests);
       await targetApi.createEpicComment(settings.targetEpicID, commentChange);
