@@ -7,6 +7,9 @@
     "make-runnable": "^1.3.6",
     "typescript": "^4.0.3"
   },
+  "scripts": {
+    "build": "tsc index.ts"
+  },
   "name": "clubhouse-api",
   "version": "1.0.0",
   "main": "index.js",

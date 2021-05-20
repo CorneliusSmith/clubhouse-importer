@@ -19,9 +19,12 @@ CLUBHOUSE_API_TOKEN_TARGET = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 
 The importer runs via command line.
 
-`cd` to the product directory and run via `node index.js <func> <args>`
+`cd` to the product directory and run ` yarn build`
+Commads are run using `node index.js <func> <args>`
 
-Methods accept a "settings" object via `args` that should specify clubhouse.io entity _IDs_ for the source project, target project, and target epic.
+Some methods accept a "settings" object via `args` that should specify clubhouse.io entity _IDs_ for the source project, target project, and target epic.
+
+**_If `yarn install` is ran ensure clubhouse-lib files are replaced with the files from the repo since missing api endpoints were added!_**
 
 To migrate the iterations from the source workspace:
 
