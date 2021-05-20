@@ -22,7 +22,10 @@ Methods accept a "settings" object via `args` that should specify clubhouse.io e
 
 
 
-* `node index.js addIterations` to migrate the iterations from the source workspace
+* ```
+  node index.js addIterations
+  ``` 
+  to migrate the iterations from the source workspace
 * `node index.js importOne --story <storyId> --target_project <projectId> --target_epic <epicId>` to import a single story
 * `node index.js importAll --source_project <projectId> --target_project <projectId> --target_epic <epicId>` to import all stories from the source workspace for a source project id
 * `node index.js linkStories --source_project <projectId>` to add any story "links" (Story YY is blocked by Story ZZ) after an import is run
