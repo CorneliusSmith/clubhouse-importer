@@ -277,10 +277,10 @@ export async function getStoryForImport(
   };
 }
 
-export async function importEpic(sourceEpicId: ID) {
+export async function importEpic(sourceEpicID: ID) {
   const resourceMaps = await getResourceMaps(sourceApi, targetApi);
 
-  await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
+  await sourceApi.getEpic(sourceEpicID).then(async (epic) => {
     //create labels
     const labelsToAdd = epic.labels.map((label) => ({
       name: label.name,
@@ -319,7 +319,10 @@ export async function importEpic(sourceEpicId: ID) {
     const remainingRequests = await limiter.removeTokens(1);
     console.log('REMAINING REQUESTS:' + remainingRequests);
     await targetApi.createEpic(importEpic).then(async (epic) => {
-      createEpicStories(sourceEpicId, epic.id, resourceMaps);
+      await Promise.all([
+        importEpicComments({ sourceEpicID, targetEpicID: epic.id }),
+        createEpicStories(sourceEpicID, epic.id, resourceMaps),
+      ]);
     }); //silverorange is source, test is target
   });
 }
@@ -379,7 +382,7 @@ export async function createEpicStories(
         fetchedStory.create,
         fetchedStory.create.linked_file_ids
       );
-      updateStory(fetchedStory);
+      await updateStory(fetchedStory);
     });
   });
 }
