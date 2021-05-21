@@ -26,6 +26,7 @@ Some methods accept a "settings" object via `args` that should specify clubhouse
 
 **_If `yarn install` is ran ensure clubhouse-lib files are replaced with the files from the repo since missing api endpoints were added!_**
 
+**Ensure the Target Project in index.ts is set correctly to avoid Unprocessible ENtity Error and run `yarn buid`**
 To migrate the iterations from the source workspace:
 
 ```
@@ -59,7 +60,7 @@ node index.js importAllEpics
 To import single epics and all its stories from one workspace to another:
 
 ```
-node index.js importEpics <epicId>
+node index.js importEpic <epicId>
 ```
 
 To import any epic stories missed if api request limit is reached during import:

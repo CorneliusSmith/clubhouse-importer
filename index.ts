@@ -16,6 +16,7 @@ import {
   mapStoryToStoryChange,
   getResourceMaps,
   mapMembers,
+  mapEpicToEpicChange,
 } from './utils';
 
 dotenv.config();
@@ -27,13 +28,13 @@ const sourceApi = Clubhouse.create(
   process.env.CLUBHOUSE_API_TOKEN_SOURCE || ''
 );
 const targetApi = Clubhouse.create(
-  process.env.CLUBHOUSE_API_TOKEN_COURSEHOST || ''
+  process.env.CLUBHOUSE_API_TOKEN_SILVER_ORANGE_AND_SMALLS || ''
 );
 
 export const defaultSettings = {
   // TODO: move to args
-  SOURCE_PROJECT_ID: 12584,
-  TARGET_PROJECT_ID: 18774,
+  SOURCE_PROJECT_ID: process.env.CLUBHOUSE_SOURCE_PROJECT,
+  TARGET_PROJECT_ID: process.env.CLUBHOUSE_TARGET_PROJECT,
   TARGET_EPIC_ID: 'input epic id',
 };
 
@@ -166,8 +167,6 @@ export async function importAll(settings: any) {
     );
     toImport.push(newStory);
   }
-  //toImport = toImport.slice(0, 10)
-  console.log(toImport.length);
 
   for (const newStory of toImport) {
     await updateStory(newStory);
@@ -178,7 +177,9 @@ export async function updateStory(newStory: StoryForUpload) {
   if (newStory.create.name && !newStory.create.name.includes(migratedPrefix)) {
     console.log('Want To Create:', newStory.create.name);
     const remainingRequests = await limiter.removeTokens(1);
-    console.log('REMAINING REQUESTS:' + remainingRequests);
+    if (remainingRequests <= 1) {
+      console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+    }
     await targetApi.createStory(newStory.create).then(async (res) => {
       console.log(`Created new story #${res.id}: ${res.name}`);
       console.log(` - - via old source story #${newStory.id}`);
@@ -194,7 +195,9 @@ export async function updateStory(newStory: StoryForUpload) {
         } **`,
       };
       const remainingRequests = await limiter.removeTokens(1);
-      console.log('REMAINING REQUESTS:' + remainingRequests);
+      if (remainingRequests <= 1) {
+        console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+      }
       await sourceApi.updateStory(newStory.id, updateSource);
     });
   } else {
@@ -279,13 +282,7 @@ export async function getStoryForImport(
 
 export async function importEpic(sourceEpicID: ID) {
   const resourceMaps = await getResourceMaps(sourceApi, targetApi);
-
   await sourceApi.getEpic(sourceEpicID).then(async (epic) => {
-    //create labels
-    const labelsToAdd = epic.labels.map((label) => ({
-      name: label.name,
-    }));
-
     //get necessary id fields
     const idMap = await _getMapObj(
       sourceApi,
@@ -294,30 +291,16 @@ export async function importEpic(sourceEpicID: ID) {
       'profile.email_address'
     );
 
-    const owner_ids = epic.owner_ids.map((id) => idMap[id]);
-    const follower_ids = epic.follower_ids.map((id) => idMap[id]);
-    const requested_by_id = idMap[epic.requested_by_id];
-
-    const description = `** Migrated From:${epic.app_url} **\n\n${epic.description}`;
-
-    const importEpic = {
-      created_at: epic.created_at,
-      completed_at_override: epic.completed_at,
-      started_at_override: epic.started_at,
-      deadline: epic.deadline,
-      description,
-      follower_ids,
-      group_id: epic.group_id,
-      labels: labelsToAdd,
-      name: epic.name,
-      owner_ids,
-      planned_start_date: epic.planned_start_date,
-      requested_by_id,
-      state: epic.state,
-      updated_at: epic.updated_at,
-    };
+    const importEpic = await mapEpicToEpicChange(
+      sourceApi,
+      targetApi,
+      epic,
+      idMap
+    );
     const remainingRequests = await limiter.removeTokens(1);
-    console.log('REMAINING REQUESTS:' + remainingRequests);
+    if (remainingRequests <= 1) {
+      console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+    }
     await targetApi.createEpic(importEpic).then(async (epic) => {
       await Promise.all([
         importEpicComments({ sourceEpicID, targetEpicID: epic.id }),
@@ -354,7 +337,9 @@ export async function createEpicStories(
   const targetProjectId = defaultSettings.TARGET_PROJECT_ID;
 
   const remainingRequests = await limiter.removeTokens(1);
-  console.log('REMAINING REQUESTS:' + remainingRequests);
+  if (remainingRequests <= 1) {
+    console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+  }
   await sourceApi.getEpic(sourceEpicId).then(async (epic) => {
     const epicStoryIds = await sourceApi
       .listEpicStories(epic.id)
@@ -363,7 +348,9 @@ export async function createEpicStories(
       });
     epicStoryIds.forEach(async (story) => {
       const remainingRequests = await limiter.removeTokens(1);
-      console.log('REMAINING REQUESTS:' + remainingRequests);
+      if (remainingRequests <= 1) {
+        console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+      }
       const fetchedStory = await getStoryForImport(
         story,
         resourceMaps,
@@ -387,20 +374,60 @@ export async function createEpicStories(
   });
 }
 
-const createMilestone = async (milestoneId: ID) => {
-  await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
+export async function createMilestone(milestoneId: ID) {
+  return await sourceApi.getMilestone(milestoneId).then(async (milestone) => {
     const importMilestone = _cleanObj({
       name: milestone.name,
-      categories: milestone.categories,
+      categories: milestone.categories.map((category) => {
+        return {
+          name: category.name,
+        };
+      }),
       started_at_override: milestone.started_at_override,
       completed_at_override: milestone.completed_at_override,
       state: milestone.state,
     });
-    await targetApi
+    const res = await targetApi
       .createMilestone(importMilestone)
-      .then((milestone) => console.log(`Created Milestone ${milestone.name}`));
+      .then((milestone) => {
+        console.log(`Created Milestone ${milestone.name}`);
+        return milestone;
+      });
+    return res;
   });
-};
+}
+
+export async function importMilestone(milestoneID: ID) {
+  const resourceMaps = await getResourceMaps(sourceApi, targetApi);
+  const idMap = await _getMapObj(
+    sourceApi,
+    targetApi,
+    'listMembers',
+    'profile.email_address'
+  );
+  const epics = await sourceApi.listMilestoneEpics(milestoneID);
+
+  createMilestone(milestoneID).then(async (milestone) => {
+    for (const epic in epics) {
+      const importEpic = await mapEpicToEpicChange(
+        sourceApi,
+        targetApi,
+        epics[epic],
+        idMap,
+        milestone.id
+      );
+      await targetApi.createEpic(importEpic).then(async (epicResult) => {
+        await Promise.all([
+          importEpicComments({
+            sourceEpicID: epics[epic].id,
+            targetEpicID: epicResult.id,
+          }),
+          createEpicStories(epics[epic].id, epicResult.id, resourceMaps),
+        ]);
+      });
+    }
+  });
+}
 
 export async function importAllLabels() {
   // toImport = [];
@@ -413,7 +440,7 @@ export async function importAllLabels() {
       if (!existingLabels.includes(label.name.toLowerCase())) {
         await targetApi.createLabel(
           label.name,
-          label.color ? label.color : 'black' //default to black color if no color exists
+          label.color ? label.color : '#000000' //default to black color if no color exists
         );
       }
     });
@@ -444,7 +471,9 @@ async function convertFilesToLinkedFiles(
   resourceMaps: ResourceMaps
 ) {
   const remainingRequests = await limiter.removeTokens(1);
-  console.log('REMAINING REQUESTS:' + remainingRequests);
+  if (remainingRequests <= 1) {
+    console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+  }
   const linked_file_ids = await uploadFiles(
     story.create.files,
     resourceMaps.members
@@ -475,7 +504,9 @@ export async function importEpicComments(settings: {
   const resourceMaps = await getResourceMaps(sourceApi, targetApi);
   const membersMap = resourceMaps.members;
   const remainingRequests = await limiter.removeTokens(1);
-  console.log('REMAINING REQUESTS:' + remainingRequests);
+  if (remainingRequests <= 1) {
+    console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+  }
   const comments = await sourceApi.listEpicComments(settings.sourceEpicID);
   if (comments) {
     comments.map(async (c) => {
@@ -486,7 +517,9 @@ export async function importEpicComments(settings: {
         text: c.text,
       };
       const remainingRequests = await limiter.removeTokens(1);
-      console.log('REMAINING REQUESTS:' + remainingRequests);
+      if (remainingRequests <= 1) {
+        console.log(`RATE LIMIT REACHED PLEASE WAIT`);
+      }
       await targetApi.createEpicComment(settings.targetEpicID, commentChange);
     });
     return 'Done Importing Epic Comments';

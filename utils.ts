@@ -1,5 +1,12 @@
-import Client, { ID, Iteration, Member, Story, Workflow } from 'clubhouse-lib';
-import { ResourceMap } from './types';
+import Client, {
+  Epic,
+  ID,
+  Iteration,
+  Member,
+  Story,
+  Workflow,
+} from 'clubhouse-lib';
+import { ResourceMap, ResourceMaps } from './types';
 
 /* Utility to do a deep resolution of a nested object key */
 export function _resolve(path: string | string[], obj: any, separator = '.') {
@@ -106,6 +113,46 @@ export function mapStoryToStoryChange(story: any, linked_file_ids: ID[]) {
     updated_at: story.updated_at,
   };
   return _cleanObj(storyChange);
+}
+
+export async function mapEpicToEpicChange(
+  sourceApi: Client<RequestInfo, Response>,
+  targetApi: Client<RequestInfo, Response>,
+  epic: Epic,
+  idMap: ResourceMap,
+  milestoneID?: ID
+) {
+  //create labels
+  const labelsToAdd = epic.labels.map((label) => ({
+    name: label.name,
+  }));
+
+  const owner_ids = epic.owner_ids.map((id) => idMap[id]);
+  const follower_ids = epic.follower_ids.map((id) => idMap[id]);
+  const requested_by_id = idMap[epic.requested_by_id];
+
+  const description = `** Migrated From:${epic.app_url} **\n\n${epic.description}`;
+
+  const importEpic = _cleanObj({
+    created_at: epic.created_at,
+    completed_at_override: epic.completed_at,
+    started_at_override: epic.started_at,
+    deadline: epic.deadline,
+    description,
+    follower_ids,
+    group_id: epic.group_id,
+    labels: labelsToAdd,
+    name: epic.name,
+    owner_ids,
+    planned_start_date: epic.planned_start_date,
+    requested_by_id,
+    state: epic.state,
+    updated_at: epic.updated_at,
+    ...(milestoneID !== undefined && {
+      milestone_id: milestoneID,
+    }),
+  });
+  return importEpic;
 }
 
 /* Create objects mapping old workspace ids to new workspace ids for
