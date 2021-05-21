@@ -7,6 +7,9 @@ Store your tokens, one for the source workspace and one for the target workspace
 ```
 CLUBHOUSE_API_TOKEN_SOURCE = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
 CLUBHOUSE_API_TOKEN_TARGET = "XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX"
+
+SOURCE_PROJECT_ID: process.env.CLUBHOUSE_SOURCE_PROJECT = "XXXXXXXX",
+TARGET_PROJECT_ID: process.env.CLUBHOUSE_TARGET_PROJECT = "XXXXXXXX",
 ```
 
 ## Requirements
@@ -27,6 +30,7 @@ Some methods accept a "settings" object via `args` that should specify clubhouse
 **_If `yarn install` is ran ensure clubhouse-lib files are replaced with the files from the repo since missing api endpoints were added!_**
 
 **Ensure the Target Project in index.ts is set correctly to avoid Unprocessible ENtity Error and run `yarn buid`**
+
 To migrate the iterations from the source workspace:
 
 ```
@@ -73,4 +77,10 @@ To import any epic comments. (This will be ran when importing all epics or singl
 
 ```
 node index.js importEpicComments --sourceEpicID <epicId> --targetEpicID <epicId>
+```
+
+To import a milestone with alll epics and stories:
+
+```
+node index.js importMilestone <milestoneId>
 ```
