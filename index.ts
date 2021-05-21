@@ -33,8 +33,8 @@ const targetApi = Clubhouse.create(
 
 export const defaultSettings = {
   // TODO: move to args
-  SOURCE_PROJECT_ID: process.env.CLUBHOUSE_SOURCE_PROJECT,
-  TARGET_PROJECT_ID: process.env.CLUBHOUSE_TARGET_PROJECT,
+  SOURCE_PROJECT_ID: process.env.CLUBHOUSE_SOURCE_PROJECT || '',
+  TARGET_PROJECT_ID: process.env.CLUBHOUSE_TARGET_PROJECT || '',
   TARGET_EPIC_ID: 'input epic id',
 };
 
